@@ -76,18 +76,20 @@ def invert_matrix(AM, OCT_EXP, OCT_LOG, tol=None):
                 AM[i,j] = oct_diff(AM[i,j], oct_mult(crScaler, AM[fd,j], OCT_EXP, OCT_LOG))
                 IM[i,j] = oct_diff(IM[i,j], oct_mult(crScaler, IM[fd,j], OCT_EXP, OCT_LOG))
     
-    print(time.time() - start3)
+    print("inverse time: ", time.time() - start3)
     return IM
 
 from pyfinite.genericmatrix import DotProduct
 
 if __name__ == "__main__":
     
-    A = array([1, 0, 2])
-    B = array([1, 2, 2])
+    A = [[255, 0, 2], [1, 0, 0], [0, 1, 2]]
+    B = [[1, 2, 255], [1, 0, 0], [0, 1, 2]]
     OCT_EXP = loadtxt("OCT_EXP.txt", dtype='i', delimiter='\n')
     OCT_LOG = loadtxt("OCT_LOG.txt", dtype='i', delimiter='\n')
+    mul = lambda u, v: oct_mult(u, v, OCT_EXP, OCT_LOG)
+    add = lambda u, v: oct_sum(u, v)
 
-    C = DotProduct(oct_mult(A.any(), B.any(), OCT_EXP, OCT_LOG), oct_sum(A.any(), B.any()), A, B)
+    C = DotProduct(mul, add, A, B)
 
     print(C)

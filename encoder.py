@@ -6,6 +6,7 @@ from itertools import count
 from scipy import sparse as sp
 from scipy.sparse import linalg as sl
 import time
+import pickle
 
 def sys_index(K):
     #fetches the systematic indices table 5.6
@@ -137,7 +138,7 @@ def intermediate_symbols(Cp, pcr):
     zeros(Kp))), shape = (S + H + Kp, 1), dtype = int)
     start1 = time.time()
     G_HDPC = matrix_oct_mult(MT.todok(), GAMMA.todok(), OCT_EXP, OCT_LOG)
-    print(time.time() - start1)
+    print("matrix oct mult: ", time.time() - start1)
     I_S = sp.identity(S, format = 'csr')
     I_H = sp.identity(H, format = 'csr')
     G_ENC = sp.dok_matrix((Kp, L))
@@ -165,7 +166,8 @@ def intermediate_symbols(Cp, pcr):
     start2 = time.time()
     C = matrix_oct_mult(invert_matrix(A, OCT_EXP, OCT_LOG), D, OCT_EXP, OCT_LOG)
     print(time.time() - start2)
-    return C.astype(int)
+    pcr.update({"A": A})
+    return (C.astype(int), pcr)
 
 def pre_coding_conditions(C, pcr):
     G_LDPC1 = pcr["G_LDPC1"]
@@ -248,18 +250,23 @@ def encoder(C, ISI, pcr):
     assert (d >=0 and a >=1 and a <= W-1 and b >=0 and b <= W-1 and \
     (d1 == 2 or d1 == 3) and a1 >= 1 and a1 <= P1-1 and b1 >=0 and \
     b1 <= P1-1), "Wrong constraints for TupleGen"
+
     result = C[b, 0]
     for _ in range(1, d):
         b = (b+a) % W
         result = oct_sum(result, C[b,0])
     while(b1 >= P): b1 = (b1 + a1) % P1
-    result = oct_sum(result, C[W + b1,0])
+    result = oct_sum(result, C[(W + b1),0])
     for _ in range(1, d1):
         b1 = (b1 + a1) % P1
         while(b1 >= P): b1 = (b1 + a1) % P1
-        result = oct_sum(result, C[W+b1, 0])
+        result = oct_sum(result, C[(W + b1), 0])
 
     return result
+
+def save_obj(obj, name ):
+    with open('obj/'+ name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 def main():
     start = time.time()
@@ -267,21 +274,24 @@ def main():
     #f = open(filename, 'rb')
     #Cp = bytearray(f.read())
     #f.close()
-    Cp = bytearray([1, 6, 99, 250, 45, 63, 12, 0, 136, 200, 100])
+    Cp = bytearray([79, 6, 99, 250, 45, 63, 12, 0, 136, 200, 100])
     ISI = 0
     K = len(Cp)
     (Cp, si) = padding(Cp, K)
     pcr = gen_paramaters(K, si)
     pcr = pre_coding_relationships(pcr)
-    C = intermediate_symbols(Cp, pcr)
+    (C, pcr) = intermediate_symbols(Cp, pcr)
     pre_coding_conditions(C, pcr)
     encoded_block = bytearray([])
     for i in range(C.shape[0]):
         ISI = i
         encoded_symbol = encoder(C, ISI, pcr)
         encoded_block = append(encoded_block, encoded_symbol)
+    
+    save_obj(pcr, "pcr")
+    save_obj(encoded_block, "encoded_block")
 
-    print(time.time() - start)
+    print("total: ", time.time() - start)
 
     print(encoded_block)
     return encoded_block
